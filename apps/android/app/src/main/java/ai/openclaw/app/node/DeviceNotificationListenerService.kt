@@ -437,6 +437,8 @@ class DeviceNotificationListenerService : NotificationListenerService() {
       NotificationActionKind.Dismiss -> {
         runCatching {
           // cancelNotification(String key) was added in API 31
+          // The 3-arg variant is deprecated but is the only option on API < 31
+          @Suppress("DEPRECATION")
           if (Build.VERSION.SDK_INT >= 31) {
             cancelNotification(sbn.key)
           } else {
