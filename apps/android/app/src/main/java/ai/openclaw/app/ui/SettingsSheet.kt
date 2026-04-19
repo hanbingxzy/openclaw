@@ -1343,9 +1343,13 @@ private fun hasMotionCapabilities(context: Context): Boolean {
 }
 
 private fun isAssistantRoleAvailable(context: Context): Boolean {
+  // RoleManager requires API 29+ (Android 10)
+  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
   return context.getSystemService(RoleManager::class.java).isRoleAvailable(RoleManager.ROLE_ASSISTANT)
 }
 
 private fun isAssistantRoleHeld(context: Context): Boolean {
+  // RoleManager requires API 29+ (Android 10)
+  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
   return context.getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_ASSISTANT)
 }
