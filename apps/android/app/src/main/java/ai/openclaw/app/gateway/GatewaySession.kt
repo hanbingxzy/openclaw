@@ -279,7 +279,7 @@ class GatewaySession(
     val remoteAddress: String = formatGatewayAuthority(endpoint.host, endpoint.port)
 
     suspend fun connect() {
-      val url = buildGatewayWebSocketUrl(endpoint.host, endpoint.port, tls != null)
+      val url = buildGatewayWebSocketUrl(endpoint.host, endpoint.port, endpoint.path, tls != null)
       val request = Request.Builder().url(url).build()
       socket = client.newWebSocket(request, Listener())
       try {
@@ -963,9 +963,10 @@ class GatewaySession(
   }
 }
 
-internal fun buildGatewayWebSocketUrl(host: String, port: Int, useTls: Boolean): String {
+internal fun buildGatewayWebSocketUrl(host: String, port: Int, path: String, useTls: Boolean): String {
   val scheme = if (useTls) "wss" else "ws"
-  return "$scheme://${formatGatewayAuthority(host, port)}"
+  val basePath = if (path.isNotEmpty()) path else ""
+  return "$scheme://${formatGatewayAuthority(host, port)}/$basePath"
 }
 
 internal fun formatGatewayAuthority(host: String, port: Int): String {

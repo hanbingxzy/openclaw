@@ -87,6 +87,10 @@ class SecurePrefs(
     MutableStateFlow(plainPrefs.getBoolean("gateway.manual.tls", true))
   val manualTls: StateFlow<Boolean> = _manualTls
 
+  private val _manualPath =
+    MutableStateFlow(plainPrefs.getString("gateway.manual.path", "") ?: "")
+  val manualPath: StateFlow<String> = _manualPath
+
   private val _gatewayToken = MutableStateFlow("")
   val gatewayToken: StateFlow<String> = _gatewayToken
 
@@ -219,6 +223,12 @@ class SecurePrefs(
   fun setManualTls(value: Boolean) {
     plainPrefs.edit { putBoolean("gateway.manual.tls", value) }
     _manualTls.value = value
+  }
+
+  fun setManualPath(value: String) {
+    val trimmed = value.trim()
+    plainPrefs.edit { putString("gateway.manual.path", trimmed) }
+    _manualPath.value = trimmed
   }
 
   fun setGatewayToken(value: String) {

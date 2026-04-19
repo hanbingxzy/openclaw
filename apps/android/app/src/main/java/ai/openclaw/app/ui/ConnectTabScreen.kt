@@ -90,6 +90,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   var setupCode by rememberSaveable { mutableStateOf("") }
   var manualHostInput by rememberSaveable { mutableStateOf(manualHost.ifBlank { "10.0.2.2" }) }
   var manualPortInput by rememberSaveable { mutableStateOf(manualPort.toString()) }
+  var manualPathInput by rememberSaveable { mutableStateOf("") }
   var manualTlsInput by rememberSaveable { mutableStateOf(manualTls) }
   var passwordInput by rememberSaveable { mutableStateOf("") }
   var validationText by rememberSaveable { mutableStateOf<String?>(null) }
@@ -127,8 +128,8 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
   }
 
   val setupResolvedEndpoint = remember(setupCode) { decodeGatewaySetupCode(setupCode)?.url?.let { parseGatewayEndpoint(it)?.displayUrl } }
-  val manualResolvedEndpoint = remember(manualHostInput, manualPortInput, manualTlsInput) {
-    composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput)?.let { parseGatewayEndpoint(it)?.displayUrl }
+  val manualResolvedEndpoint = remember(manualHostInput, manualPortInput, manualPathInput, manualTlsInput) {
+    composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput, manualPathInput)?.let { parseGatewayEndpoint(it)?.displayUrl }
   }
 
   val activeEndpoint =
@@ -254,6 +255,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               manualHostInput = manualHostInput,
               manualPortInput = manualPortInput,
               manualTlsInput = manualTlsInput,
+              manualPathInput = manualPathInput,
               fallbackBootstrapToken = gatewayBootstrapToken,
               fallbackToken = gatewayToken,
               fallbackPassword = passwordInput,
@@ -273,7 +275,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                   )
                 }
               } else {
-                val manualUrl = composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput)
+                val manualUrl = composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput, manualPathInput)
                 val parsedGateway = manualUrl?.let(::parseGatewayEndpointResult)
                 gatewayEndpointValidationMessage(
                   parsedGateway?.error ?: GatewayEndpointValidationError.INVALID_URL,
@@ -291,6 +293,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           viewModel.setManualHost(config.host)
           viewModel.setManualPort(config.port)
           viewModel.setManualTls(config.tls)
+          viewModel.setManualPath(config.path)
           viewModel.setGatewayBootstrapToken(config.bootstrapToken)
           if (config.token.isNotBlank()) {
             viewModel.setGatewayToken(config.token)
@@ -299,7 +302,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
           }
           viewModel.setGatewayPassword(config.password)
           viewModel.connect(
-            GatewayEndpoint.manual(host = config.host, port = config.port),
+            GatewayEndpoint.manual(host = config.host, port = config.port, path = config.path),
             token = config.token.ifEmpty { null },
             bootstrapToken = config.bootstrapToken.ifEmpty { null },
             password = config.password.ifEmpty { null },
@@ -451,6 +454,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 onClick = {
                   manualHostInput = "10.0.2.2"
                   manualPortInput = "18789"
+                  manualPathInput = ""
                   manualTlsInput = false
                   validationText = null
                 },
@@ -460,6 +464,7 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
                 onClick = {
                   manualHostInput = "127.0.0.1"
                   manualPortInput = "18789"
+                  manualPathInput = ""
                   manualTlsInput = false
                   validationText = null
                 },
@@ -498,6 +503,22 @@ fun ConnectTabScreen(viewModel: MainViewModel) {
               singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               textStyle = mobileBody.copy(fontFamily = FontFamily.Monospace, color = mobileText),
+              shape = RoundedCornerShape(14.dp),
+              colors = outlinedColors(),
+            )
+
+            Text("Path (optional)", style = mobileCaption1.copy(fontWeight = FontWeight.SemiBold), color = mobileTextSecondary)
+            OutlinedTextField(
+              value = manualPathInput,
+              onValueChange = {
+                manualPathInput = it
+                validationText = null
+              },
+              placeholder = { Text("/openclaw/", style = mobileBody, color = mobileTextTertiary) },
+              modifier = Modifier.fillMaxWidth(),
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+              textStyle = mobileBody.copy(color = mobileText),
               shape = RoundedCornerShape(14.dp),
               colors = outlinedColors(),
             )

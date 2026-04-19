@@ -551,6 +551,7 @@ class NodeRuntime(
   val manualHost: StateFlow<String> = prefs.manualHost
   val manualPort: StateFlow<Int> = prefs.manualPort
   val manualTls: StateFlow<Boolean> = prefs.manualTls
+  val manualPath: StateFlow<String> = prefs.manualPath
   val gatewayToken: StateFlow<String> = prefs.gatewayToken
   val onboardingCompleted: StateFlow<Boolean> = prefs.onboardingCompleted
   fun setGatewayToken(value: String) = prefs.setGatewayToken(value)
@@ -657,8 +658,9 @@ class NodeRuntime(
     if (manualEnabled.value) {
       val host = manualHost.value.trim()
       val port = manualPort.value
+      val path = manualPath.value.trim()
       if (host.isEmpty() || port !in 1..65535) return null
-      return GatewayEndpoint.manual(host = host, port = port)
+      return GatewayEndpoint.manual(host = host, port = port, path = path)
     }
 
     val targetStableId = lastDiscoveredStableId.value.trim()
@@ -721,6 +723,10 @@ class NodeRuntime(
 
   fun setManualTls(value: Boolean) {
     prefs.setManualTls(value)
+  }
+
+  fun setManualPath(value: String) {
+    prefs.setManualPath(value)
   }
 
   fun setCanvasDebugStatusEnabled(value: Boolean) {
@@ -933,11 +939,12 @@ class NodeRuntime(
   fun connectManual() {
     val host = manualHost.value.trim()
     val port = manualPort.value
+    val path = manualPath.value.trim()
     if (host.isEmpty() || port <= 0 || port > 65535) {
       _statusText.value = "Failed: invalid manual host/port"
       return
     }
-    connect(GatewayEndpoint.manual(host = host, port = port))
+    connect(GatewayEndpoint.manual(host = host, port = port, path = path))
   }
 
   private fun loadStoredRoleDeviceToken(role: String): String? {

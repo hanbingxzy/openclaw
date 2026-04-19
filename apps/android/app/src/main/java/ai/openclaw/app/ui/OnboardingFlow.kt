@@ -226,6 +226,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
   var gatewayAdvancedOpen by rememberSaveable { mutableStateOf(false) }
   var manualHost by rememberSaveable { mutableStateOf("10.0.2.2") }
   var manualPort by rememberSaveable { mutableStateOf("18789") }
+  var manualPath by rememberSaveable { mutableStateOf("") }
   var manualTls by rememberSaveable { mutableStateOf(false) }
   var gatewayError by rememberSaveable { mutableStateOf<String?>(null) }
   var attemptedConnect by rememberSaveable { mutableStateOf(false) }
@@ -554,6 +555,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
               setupCode = setupCode,
               manualHost = manualHost,
               manualPort = manualPort,
+              manualPath = manualPath,
               manualTls = manualTls,
               gatewayToken = persistedGatewayToken,
               gatewayPassword = gatewayPassword,
@@ -603,6 +605,10 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
               },
               onManualPortChange = {
                 manualPort = it
+                gatewayError = null
+              },
+              onManualPathChange = {
+                manualPath = it
                 gatewayError = null
               },
               onManualTlsChange = { manualTls = it },
@@ -829,7 +835,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     viewModel.setGatewayPassword("")
                   }
                 } else {
-                  val manualUrl = composeGatewayManualUrl(manualHost, manualPort, manualTls)
+                  val manualUrl = composeGatewayManualUrl(manualHost, manualPort, manualTls, manualPath)
                   val parsedGateway = manualUrl?.let(::parseGatewayEndpointResult)
                   if (parsedGateway?.config == null) {
                     gatewayError =
@@ -901,6 +907,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                   viewModel.setManualHost(parsed.config.host)
                   viewModel.setManualPort(parsed.config.port)
                   viewModel.setManualTls(parsed.config.tls)
+                  viewModel.setManualPath(parsed.config.path)
                   if (gatewayInputMode == GatewayInputMode.Manual) {
                     viewModel.setGatewayBootstrapToken("")
                   } else {
@@ -914,7 +921,7 @@ fun OnboardingFlow(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                   }
                   viewModel.setGatewayPassword(password)
                   viewModel.connect(
-                    GatewayEndpoint.manual(host = parsed.config.host, port = parsed.config.port),
+                    GatewayEndpoint.manual(host = parsed.config.host, port = parsed.config.port, path = parsed.config.path),
                     token = token.ifEmpty { null },
                     bootstrapToken = bootstrapToken,
                     password = password.ifEmpty { null },
@@ -1044,6 +1051,7 @@ private fun GatewayStep(
   setupCode: String,
   manualHost: String,
   manualPort: String,
+  manualPath: String,
   manualTls: Boolean,
   gatewayToken: String,
   gatewayPassword: String,
@@ -1054,12 +1062,13 @@ private fun GatewayStep(
   onSetupCodeChange: (String) -> Unit,
   onManualHostChange: (String) -> Unit,
   onManualPortChange: (String) -> Unit,
+  onManualPathChange: (String) -> Unit,
   onManualTlsChange: (Boolean) -> Unit,
   onTokenChange: (String) -> Unit,
   onPasswordChange: (String) -> Unit,
 ) {
   val resolvedEndpoint = remember(setupCode) { decodeGatewaySetupCode(setupCode)?.url?.let { parseGatewayEndpoint(it)?.displayUrl } }
-  val manualResolvedEndpoint = remember(manualHost, manualPort, manualTls) { composeGatewayManualUrl(manualHost, manualPort, manualTls)?.let { parseGatewayEndpoint(it)?.displayUrl } }
+  val manualResolvedEndpoint = remember(manualHost, manualPort, manualPath, manualTls) { composeGatewayManualUrl(manualHost, manualPort, manualTls, manualPath)?.let { parseGatewayEndpoint(it)?.displayUrl } }
 
   StepShell(title = "Gateway Connection") {
     Text(
@@ -1168,6 +1177,24 @@ private fun GatewayStep(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             textStyle = onboardingBodyStyle.copy(fontFamily = FontFamily.Monospace, color = onboardingText),
+            shape = RoundedCornerShape(14.dp),
+            colors =
+              onboardingTextFieldColors(),
+          )
+
+          Text(
+            "PATH (optional)",
+            style = onboardingCaption1Style.copy(letterSpacing = 0.9.sp),
+            color = onboardingTextSecondary,
+          )
+          OutlinedTextField(
+            value = manualPath,
+            onValueChange = onManualPathChange,
+            placeholder = { Text("/openclaw/", color = onboardingTextTertiary, style = onboardingBodyStyle) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            textStyle = onboardingBodyStyle.copy(color = onboardingText),
             shape = RoundedCornerShape(14.dp),
             colors =
               onboardingTextFieldColors(),

@@ -192,6 +192,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     prefs.setManualTls(value)
   }
 
+  fun setManualPath(value: String) {
+    prefs.setManualPath(value)
+  }
+
   fun setGatewayToken(value: String) {
     prefs.setGatewayToken(value)
   }

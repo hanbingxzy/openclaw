@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonObject
 internal data class GatewayEndpointConfig(
   val host: String,
   val port: Int,
+  val path: String,
   val tls: Boolean,
   val displayUrl: String,
 )
@@ -27,6 +28,7 @@ internal data class GatewaySetupCode(
 internal data class GatewayConnectConfig(
   val host: String,
   val port: Int,
+  val path: String,
   val tls: Boolean,
   val bootstrapToken: String,
   val token: String,
@@ -69,6 +71,7 @@ internal fun resolveGatewayConnectConfig(
   manualHostInput: String,
   manualPortInput: String,
   manualTlsInput: Boolean,
+  manualPathInput: String,
   fallbackBootstrapToken: String,
   fallbackToken: String,
   fallbackPassword: String,
@@ -92,6 +95,7 @@ internal fun resolveGatewayConnectConfig(
     return GatewayConnectConfig(
       host = parsed.host,
       port = parsed.port,
+      path = parsed.path,
       tls = parsed.tls,
       bootstrapToken = setupBootstrapToken,
       token = sharedToken,
@@ -99,7 +103,7 @@ internal fun resolveGatewayConnectConfig(
     )
   }
 
-  val manualUrl = composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput) ?: return null
+  val manualUrl = composeGatewayManualUrl(manualHostInput, manualPortInput, manualTlsInput, manualPathInput) ?: return null
   val parsed = parseGatewayEndpointResult(manualUrl).config ?: return null
   val savedManualEndpoint =
     composeGatewayManualUrl(savedManualHost, savedManualPort, savedManualTls)
@@ -114,6 +118,7 @@ internal fun resolveGatewayConnectConfig(
   return GatewayConnectConfig(
     host = parsed.host,
     port = parsed.port,
+    path = parsed.path,
     tls = parsed.tls,
     bootstrapToken = if (preserveBootstrapToken) fallbackBootstrapToken.trim() else "",
     token = fallbackToken.trim(),
@@ -159,16 +164,18 @@ internal fun parseGatewayEndpoint(rawInput: String): GatewayEndpointConfig? {
       else -> 443
     }
   val port = uri.port.takeIf { it in 1..65535 } ?: defaultPort
+  // Preserve the path from the URI (e.g., "/openclaw/")
+  val path = uri.path?.takeIf { it.isNotEmpty() && it != "/" } ?: ""
   val displayHost = if (host.contains(":")) "[$host]" else host
   val displayUrl =
     if (port == displayPort && defaultPort == displayPort) {
-      "${if (tls) "https" else "http"}://$displayHost"
+      "${if (tls) "https" else "http"}://$displayHost${if (path.isNotEmpty()) path else ""}"
     } else {
-      "${if (tls) "https" else "http"}://$displayHost:$port"
+      "${if (tls) "https" else "http"}://$displayHost:$port${if (path.isNotEmpty()) path else ""}"
     }
 
   return GatewayEndpointParseResult(
-    config = GatewayEndpointConfig(host = host, port = port, tls = tls, displayUrl = displayUrl),
+    config = GatewayEndpointConfig(host = host, port = port, path = path, tls = tls, displayUrl = displayUrl),
   )
 }
 
@@ -240,7 +247,7 @@ internal fun gatewayEndpointValidationMessage(
   }
 }
 
-internal fun composeGatewayManualUrl(hostInput: String, portInput: String, tls: Boolean): String? {
+internal fun composeGatewayManualUrl(hostInput: String, portInput: String, tls: Boolean, pathInput: String = ""): String? {
   val host = hostInput.trim()
   if (host.isEmpty()) return null
   val portTrimmed = portInput.trim()
@@ -251,7 +258,8 @@ internal fun composeGatewayManualUrl(hostInput: String, portInput: String, tls: 
   }
   if (port !in 1..65535) return null
   val scheme = if (tls) "https" else "http"
-  return "$scheme://$host:$port"
+  val path = pathInput.trim().let { if (it.isNotEmpty() && !it.startsWith("/")) "/$it" else it }
+  return "$scheme://$host:$port$path"
 }
 
 private fun parseJsonObject(input: String): JsonObject? {
