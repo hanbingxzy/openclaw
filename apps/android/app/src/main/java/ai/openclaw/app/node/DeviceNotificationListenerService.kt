@@ -6,6 +6,7 @@ import android.app.RemoteInput
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import ai.openclaw.app.NotificationBurstLimiter
@@ -170,11 +171,16 @@ class DeviceNotificationListenerService : NotificationListenerService() {
   override fun onNotificationRemoved(sbn: StatusBarNotification?) {
     super.onNotificationRemoved(sbn)
     val removed = sbn ?: return
-    val key = removed.key.trim()
-    if (key.isEmpty()) {
+    // sbn.key field was added in API 31; use composite key for API < 31
+    val removedKey = if (Build.VERSION.SDK_INT >= 31) {
+      removed.key.trim()
+    } else {
+      "${removed.packageName}:${removed.id}:${removed.postTime}"
+    }
+    if (removedKey.isEmpty()) {
       return
     }
-    DeviceNotificationStore.remove(key)
+    DeviceNotificationStore.remove(removedKey)
     rememberRecentPackage(removed.packageName)
     if (removed.packageName == packageName) {
       return
@@ -184,7 +190,7 @@ class DeviceNotificationListenerService : NotificationListenerService() {
       notificationChangedPayload(
         entry = null,
         change = "removed",
-        key = key,
+        key = removedKey,
         packageName = packageName,
         postTimeMs = removed.postTime,
         isOngoing = removed.isOngoing,
@@ -260,7 +266,12 @@ class DeviceNotificationListenerService : NotificationListenerService() {
 
   private fun StatusBarNotification.toEntry(): DeviceNotificationEntry {
     val extras = notification.extras
-    val keyValue = key.takeIf { it.isNotBlank() } ?: "$packageName:$id:$postTime"
+    // sbn.key field was added in API 31; use composite key for API < 31
+    val keyValue = if (Build.VERSION.SDK_INT >= 31) {
+      key.takeIf { it.isNotBlank() } ?: "$packageName:$id:$postTime"
+    } else {
+      "$packageName:$id:$postTime"
+    }
     val title = sanitizeNotificationText(extras?.getCharSequence(Notification.EXTRA_TITLE))
     val body =
       sanitizeNotificationText(extras?.getCharSequence(Notification.EXTRA_BIG_TEXT))
@@ -330,8 +341,11 @@ class DeviceNotificationListenerService : NotificationListenerService() {
     }
 
     fun requestServiceRebind(context: Context) {
-      runCatching {
-        NotificationListenerService.requestRebind(serviceComponent(context))
+      // requestRebind was added in API 31; no equivalent on older platforms
+      if (Build.VERSION.SDK_INT >= 31) {
+        runCatching {
+          NotificationListenerService.requestRebind(serviceComponent(context))
+        }
       }
     }
 
@@ -375,9 +389,16 @@ class DeviceNotificationListenerService : NotificationListenerService() {
   }
 
   private fun executeActionInternal(request: NotificationActionRequest): NotificationActionResult {
+    // sbn.key field was added in API 31; use composite key comparison for API < 31
     val sbn =
       activeNotifications
-        ?.firstOrNull { it.key == request.key }
+        ?.firstOrNull { notification ->
+          if (Build.VERSION.SDK_INT >= 31) {
+            notification.key == request.key
+          } else {
+            "${notification.packageName}:${notification.id}:${notification.postTime}" == request.key
+          }
+        }
         ?: return NotificationActionResult(
           ok = false,
           code = "NOTIFICATION_NOT_FOUND",
@@ -415,8 +436,13 @@ class DeviceNotificationListenerService : NotificationListenerService() {
 
       NotificationActionKind.Dismiss -> {
         runCatching {
-          cancelNotification(sbn.key)
-          DeviceNotificationStore.remove(sbn.key)
+          // cancelNotification(String key) was added in API 31
+          if (Build.VERSION.SDK_INT >= 31) {
+            cancelNotification(sbn.key)
+          } else {
+            cancelNotification(sbn.packageName, sbn.tag, sbn.id)
+          }
+          DeviceNotificationStore.remove(request.key)
         }.fold(
           onSuccess = { NotificationActionResult(ok = true) },
           onFailure = { err ->
