@@ -6,6 +6,7 @@ import android.net.DnsResolver
 import android.net.NetworkCapabilities
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.os.Build
 import android.os.CancellationSignal
 import android.util.Log
 import java.io.IOException
@@ -51,7 +52,12 @@ class GatewayDiscovery(
 ) {
   private val nsd = context.getSystemService(NsdManager::class.java)
   private val connectivity = context.getSystemService(ConnectivityManager::class.java)
-  private val dns = DnsResolver.getInstance()
+  // DnsResolver requires API 29+ (Android 10); use lazy init with version check
+  private val dns: DnsResolver? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    DnsResolver.getInstance()
+  } else {
+    null
+  }
   private val serviceType = "_openclaw-gw._tcp."
   private val wideAreaDomain = System.getenv("OPENCLAW_WIDE_AREA_DOMAIN")
   private val logTag = "OpenClaw/GatewayDiscovery"
@@ -335,6 +341,8 @@ class GatewayDiscovery(
   }
 
   private suspend fun queryViaSystemDns(query: Message): Message? {
+    // DnsResolver requires API 29+ (Android 10)
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || dns == null) return null
     val network = preferredDnsNetwork()
     val bytes =
       try {
@@ -440,12 +448,14 @@ class GatewayDiscovery(
     }
   }
 
-  private suspend fun rawQuery(network: android.net.Network?, wireQuery: ByteArray): ByteArray =
-    suspendCancellableCoroutine { cont ->
+  private suspend fun rawQuery(network: android.net.Network?, wireQuery: ByteArray): ByteArray {
+    // This method should only be called on API 29+ where dns is non-null
+    val resolver = dns ?: throw IOException("DnsResolver not available on API < 29")
+    return suspendCancellableCoroutine { cont ->
       val signal = CancellationSignal()
       cont.invokeOnCancellation { signal.cancel() }
 
-      dns.rawQuery(
+      resolver.rawQuery(
         network,
         wireQuery,
         DnsResolver.FLAG_EMPTY,
@@ -462,6 +472,7 @@ class GatewayDiscovery(
         },
       )
     }
+  }
 
   private fun txtValue(records: List<TXTRecord>, key: String): String? {
     val prefix = "$key="
